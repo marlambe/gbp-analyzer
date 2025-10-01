@@ -11,14 +11,16 @@ const GBPAnalyzer = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState(null);
-  const [aiInsights, setAiInsights] = useState(null);
   const [showEmailCapture, setShowEmailCapture] = useState(false);
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
 
   const searchWithAPI = async () => {
-    if (!businessName || !location) return setError('Please enter both business name and location');
+    if (!businessName || !location) {
+      setError('Please enter both business name and location');
+      return;
+    }
     setIsSearching(true);
     setError('');
     setSearchResults([]);
@@ -32,7 +34,9 @@ const GBPAnalyzer = () => {
       if (data.success) {
         setSearchResults(data.results);
         if (data.results.length === 0) setError('No businesses found. Try different search terms.');
-      } else setError(data.error || 'Search failed.');
+      } else {
+        setError(data.error || 'Search failed.');
+      }
     } catch (err) {
       setError('Search failed.');
     }
@@ -50,84 +54,91 @@ const GBPAnalyzer = () => {
       });
       const data = await res.json();
       if (data.success) {
-        const baseAnalysis = generateAPIAnalysis(data.result, placeName);
-        setAnalysis(baseAnalysis);
-        await getAIInsights(placeName, baseAnalysis.placeDetails, baseAnalysis.categories, 'Google Places API');
-        setShowEmailCapture(true);
-      } else setError(data.error || 'Failed to get details');
+        await getAIAnalysis(placeName, data.result, 'Google Places API');
+      } else {
+        setError(data.error || 'Failed to get details');
+      }
     } catch (err) {
       setError('Analysis failed.');
     }
     setIsAnalyzing(false);
   };
 
-  const generateAPIAnalysis = (pd, bn) => {
-    const cats = [];
-    let cs = 0, ci = [];
-    if (pd.name) cs += 5;
-    if (pd.formatted_address) cs += 5;
-    if (pd.formatted_phone_number) cs += 5; else ci.push('Missing phone');
-    if (pd.website) cs += 5; else ci.push('No website');
-    if (pd.opening_hours) cs += 5; else ci.push('No hours');
-    cats.push({ name: 'Profile Completion', score: cs * 4, issues: ci });
-    
-    let rs = 0, ri = [];
-    const rat = pd.rating || 0, rc = pd.user_ratings_total || 0;
-    if (rat >= 4.5) rs += 15; else if (rat >= 4.0) rs += 12; else if (rat >= 3.5) rs += 8; else { rs += 4; ri.push('Low rating'); }
-    if (rc >= 100) rs += 15; else if (rc >= 50) rs += 10; else if (rc >= 20) rs += 6; else { rs += 2; ri.push('Need more reviews'); }
-    cats.push({ name: 'Reviews & Ratings', score: Math.round((rs / 30) * 100), issues: ri });
-    
-    const pc = pd.photos?.length || 0, ps = Math.min(pc * 10, 100);
-    cats.push({ name: 'Photos & Visual Content', score: ps, issues: ps < 50 ? ['Need more photos'] : [] });
-    cats.push({ name: 'Local SEO Optimization', score: 70, issues: [] });
-    
-    const ts = cats.reduce((s, c) => s + (c.score * (c.name === 'Profile Completion' ? 0.25 : c.name === 'Reviews & Ratings' ? 0.30 : c.name === 'Photos & Visual Content' ? 0.20 : 0.25)), 0);
-    return {
-      overallScore: Math.round(ts), businessName: bn, categories: cats, dataSource: 'Google Places API',
-      placeDetails: { rating: rat, reviewCount: rc, photoCount: pc, hasWebsite: !!pd.website, hasPhone: !!pd.formatted_phone_number, hasHours: !!pd.opening_hours, address: pd.formatted_address }
-    };
-  };
-
   const analyzeManually = async () => {
+    if (!businessName) {
+      setError('Please enter business name');
+      return;
+    }
     setIsAnalyzing(true);
-    const rat = parseFloat(manualData.rating) || 0, rc = parseInt(manualData.reviewCount) || 0, pc = parseInt(manualData.photoCount) || 0;
-    let ps = 20;
-    if (manualData.hasWebsite) ps += 20;
-    if (manualData.hasPhone) ps += 20;
-    if (manualData.hasHours) ps += 20;
-    if (manualData.hasDescription) ps += 20;
-    let rs = 0;
-    if (rat >= 4.5) rs += 50; else if (rat >= 4.0) rs += 40; else if (rat >= 3.5) rs += 25;
-    if (rc >= 100) rs += 50; else if (rc >= 50) rs += 35; else if (rc >= 20) rs += 20;
-    const phs = Math.min(pc * 5, 100);
-    const os = Math.round((ps * 0.25) + (rs * 0.30) + (phs * 0.20) + (70 * 0.25));
-    const cats = [
-      { name: 'Profile Completion', score: ps, issues: ps < 80 ? ['Missing elements'] : [] },
-      { name: 'Reviews & Ratings', score: rs, issues: rs < 70 ? ['Low reviews'] : [] },
-      { name: 'Photos & Visual Content', score: phs, issues: phs < 60 ? ['Need photos'] : [] },
-      { name: 'Local SEO Optimization', score: 70, issues: [] }
-    ];
-    const ba = {
-      overallScore: os, businessName, categories: cats, dataSource: 'Manual Input',
-      placeDetails: { rating: rat, reviewCount: rc, photoCount: pc, hasWebsite: manualData.hasWebsite, hasPhone: manualData.hasPhone, hasHours: manualData.hasHours }
+    setError('');
+    
+    const placeDetails = {
+      rating: parseFloat(manualData.rating) || 0,
+      reviewCount: parseInt(manualData.reviewCount) || 0,
+      photoCount: parseInt(manualData.photoCount) || 0,
+      hasWebsite: manualData.hasWebsite,
+      hasPhone: manualData.hasPhone,
+      hasHours: manualData.hasHours,
+      hasDescription: manualData.hasDescription,
+      location: location
     };
-    setAnalysis(ba);
-    await getAIInsights(businessName, ba.placeDetails, cats, 'Manual Input');
-    setShowEmailCapture(true);
+    
+    await getAIAnalysis(businessName, placeDetails, 'Manual Input');
     setIsAnalyzing(false);
   };
 
-  const getAIInsights = async (bn, pd, cats, ds) => {
+  const getAIAnalysis = async (bn, placeDetails, dataSource) => {
     try {
       const res = await fetch('/api/analyze-with-ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businessName: bn, businessData: { ...pd, categories: cats }, dataSource: ds })
+        body: JSON.stringify({ 
+          businessName: bn, 
+          placeDetails: placeDetails, 
+          dataSource: dataSource 
+        })
       });
       const data = await res.json();
-      if (data.success) setAiInsights(data.aiAnalysis);
+      
+      if (data.success && data.aiAnalysis) {
+        const aiAnalysis = data.aiAnalysis;
+        
+        const transformedAnalysis = {
+          overallScore: aiAnalysis.overallScore,
+          businessName: bn,
+          dataSource: dataSource,
+          categories: aiAnalysis.categories.map(cat => ({
+            name: cat.name,
+            score: cat.score,
+            issues: cat.issues || [],
+            strengths: cat.strengths || [],
+            recommendations: cat.recommendations || []
+          })),
+          placeDetails: {
+            rating: placeDetails.rating || placeDetails.user_ratings_total || 0,
+            reviewCount: placeDetails.reviewCount || placeDetails.user_ratings_total || 0,
+            photoCount: placeDetails.photoCount || (placeDetails.photos ? placeDetails.photos.length : 0) || 0,
+            hasWebsite: placeDetails.hasWebsite || !!placeDetails.website,
+            hasPhone: placeDetails.hasPhone || !!placeDetails.formatted_phone_number,
+            hasHours: placeDetails.hasHours || !!placeDetails.opening_hours,
+            address: placeDetails.formatted_address || placeDetails.location || ''
+          },
+          quickWins: aiAnalysis.quickWins || [],
+          criticalIssues: aiAnalysis.criticalIssues || [],
+          competitivePosition: aiAnalysis.competitivePosition || '',
+          potentialImpact: aiAnalysis.potentialImpact || '',
+          nextSteps: aiAnalysis.nextSteps || [],
+          estimatedTimeToImprove: aiAnalysis.estimatedTimeToImprove || ''
+        };
+        
+        setAnalysis(transformedAnalysis);
+        setShowEmailCapture(true);
+      } else {
+        setError('AI analysis failed. Please try again.');
+      }
     } catch (err) {
       console.error('AI error:', err);
+      setError('Failed to get AI analysis.');
     }
   };
 
@@ -136,7 +147,7 @@ const GBPAnalyzer = () => {
       await fetch('/api/send-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userEmail: email, businessName: analysis.businessName, analysis, aiInsights })
+        body: JSON.stringify({ userEmail: email, businessName: analysis.businessName, analysis })
       });
       setSubmitted(true);
     } catch (err) {
@@ -145,12 +156,22 @@ const GBPAnalyzer = () => {
   };
 
   const resetApp = () => {
-    setAnalysis(null); setAiInsights(null); setShowEmailCapture(false); setSubmitted(false); setBusinessName(''); setLocation(''); setEmail(''); setSearchResults([]); setError('');
+    setAnalysis(null);
+    setShowEmailCapture(false);
+    setSubmitted(false);
+    setBusinessName('');
+    setLocation('');
+    setEmail('');
+    setSearchResults([]);
+    setError('');
     setManualData({ rating: '', reviewCount: '', photoCount: '', hasWebsite: false, hasPhone: false, hasHours: false, hasDescription: false });
   };
 
-  const getScoreColor = (s) => s >= 80 ? '#10B981' : s >= 60 ? '#F59E0B' : '#EF4444';
-  const getPriorityColor = (p) => p === 'High' ? '#EF4444' : p === 'Medium' ? '#F59E0B' : '#10B981';
+  const getScoreColor = (s) => {
+    if (s >= 80) return '#10B981';
+    if (s >= 60) return '#F59E0B';
+    return '#EF4444';
+  };
 
   if (submitted) {
     return (
@@ -176,12 +197,12 @@ const GBPAnalyzer = () => {
           <div style={{ backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', padding: '40px', marginBottom: '32px' }}>
             <div style={{ textAlign: 'center', marginBottom: '40px' }}>
               <h2 style={{ fontSize: '32px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>{analysis.businessName}</h2>
-              <div style={{ fontSize: '64px', fontWeight: 'bold', color: getScoreColor(analysis.overallScore), backgroundColor: `${getScoreColor(analysis.overallScore)}20`, padding: '24px 32px', borderRadius: '16px', display: 'inline-block', marginTop: '16px' }}>
+              <div style={{ fontSize: '64px', fontWeight: 'bold', color: getScoreColor(analysis.overallScore), backgroundColor: getScoreColor(analysis.overallScore) + '20', padding: '24px 32px', borderRadius: '16px', display: 'inline-block', marginTop: '16px' }}>
                 {analysis.overallScore}/100
               </div>
               <p style={{ color: '#6B7280', marginTop: '16px', fontSize: '18px' }}>Overall Score</p>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '12px', padding: '8px 16px', backgroundColor: '#EFF6FF', borderRadius: '20px' }}>
-                <span>🤖</span><span style={{ color: '#2563EB', fontSize: '14px', fontWeight: '500' }}>AI-Powered</span>
+                <span>🤖</span><span style={{ color: '#2563EB', fontSize: '14px', fontWeight: '500' }}>AI-Powered Analysis</span>
               </div>
             </div>
 
@@ -190,13 +211,26 @@ const GBPAnalyzer = () => {
                 <div key={i} style={{ border: '1px solid #E5E7EB', borderRadius: '12px', padding: '24px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                     <h3 style={{ fontWeight: '600', color: '#111827', fontSize: '16px' }}>{c.name}</h3>
-                    <div style={{ backgroundColor: `${getScoreColor(c.score)}20`, color: getScoreColor(c.score), padding: '4px 12px', borderRadius: '20px', fontSize: '14px', fontWeight: '600' }}>
+                    <div style={{ backgroundColor: getScoreColor(c.score) + '20', color: getScoreColor(c.score), padding: '4px 12px', borderRadius: '20px', fontSize: '14px', fontWeight: '600' }}>
                       {c.score}/100
                     </div>
                   </div>
-                  {c.issues.length > 0 && c.issues.map((iss, idx) => (
-                    <p key={idx} style={{ fontSize: '13px', color: '#6B7280', marginBottom: '4px' }}>• {iss}</p>
-                  ))}
+                  {c.strengths && c.strengths.length > 0 && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <p style={{ fontSize: '12px', fontWeight: '600', color: '#10B981', marginBottom: '4px' }}>Strengths:</p>
+                      {c.strengths.map((str, idx) => (
+                        <p key={idx} style={{ fontSize: '13px', color: '#059669', marginBottom: '4px' }}>✓ {str}</p>
+                      ))}
+                    </div>
+                  )}
+                  {c.issues && c.issues.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: '12px', fontWeight: '600', color: '#EF4444', marginBottom: '4px' }}>Issues:</p>
+                      {c.issues.map((iss, idx) => (
+                        <p key={idx} style={{ fontSize: '13px', color: '#DC2626', marginBottom: '4px' }}>• {iss}</p>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -208,73 +242,63 @@ const GBPAnalyzer = () => {
                   <div>⭐ {analysis.placeDetails.rating}/5</div>
                   <div>💬 {analysis.placeDetails.reviewCount} reviews</div>
                   <div>📸 {analysis.placeDetails.photoCount} photos</div>
-                  <div>🌐 {analysis.placeDetails.hasWebsite ? 'Yes' : 'No'}</div>
-                  <div>📞 {analysis.placeDetails.hasPhone ? 'Yes' : 'No'}</div>
-                  <div>🕐 {analysis.placeDetails.hasHours ? 'Yes' : 'No'}</div>
+                  <div>🌐 Website: {analysis.placeDetails.hasWebsite ? 'Yes' : 'No'}</div>
+                  <div>📞 Phone: {analysis.placeDetails.hasPhone ? 'Yes' : 'No'}</div>
+                  <div>🕐 Hours: {analysis.placeDetails.hasHours ? 'Yes' : 'No'}</div>
                 </div>
               </div>
             )}
 
-            {aiInsights && (
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                  <span style={{ fontSize: '32px' }}>🤖</span>
-                  <h3 style={{ fontSize: '24px', fontWeight: '700', color: '#111827' }}>AI Insights</h3>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '32px' }}>
-                  <div style={{ backgroundColor: '#ECFDF5', borderRadius: '12px', padding: '24px', border: '1px solid #D1FAE5' }}>
-                    <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#065F46', marginBottom: '16px' }}>💪 Strengths</h4>
-                    {aiInsights.strengths.map((s, i) => (
-                      <p key={i} style={{ fontSize: '14px', color: '#047857', marginBottom: '8px' }}>✓ {s}</p>
-                    ))}
-                  </div>
-                  <div style={{ backgroundColor: '#FEF3C7', borderRadius: '12px', padding: '24px', border: '1px solid #FDE68A' }}>
-                    <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#92400E', marginBottom: '16px' }}>⚠️ To Improve</h4>
-                    {aiInsights.weaknesses.map((w, i) => (
-                      <p key={i} style={{ fontSize: '14px', color: '#B45309', marginBottom: '8px' }}>• {w}</p>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ backgroundColor: '#DBEAFE', borderRadius: '12px', padding: '24px', marginBottom: '24px', border: '1px solid #BFDBFE' }}>
-                  <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#1E40AF', marginBottom: '16px' }}>⚡ Quick Wins</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '12px' }}>
-                    {aiInsights.quickWins.map((w, i) => (
-                      <div key={i} style={{ backgroundColor: 'white', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', color: '#1E40AF' }}>
-                        ✨ {w}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ backgroundColor: 'white', border: '2px solid #E5E7EB', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
-                  <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '16px' }}>📋 Action Plan</h4>
-                  {aiInsights.recommendations.map((r, i) => (
-                    <div key={i} style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px', marginBottom: '12px', borderLeft: `4px solid ${getPriorityColor(r.priority)}` }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <h5 style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>{r.category}</h5>
-                        <span style={{ backgroundColor: `${getPriorityColor(r.priority)}20`, color: getPriorityColor(r.priority), padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '600' }}>
-                          {r.priority}
-                        </span>
-                      </div>
-                      <p style={{ fontSize: '14px', color: '#374151', marginBottom: '8px' }}><strong>Action:</strong> {r.action}</p>
-                      <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '4px' }}><strong>Impact:</strong> {r.impact}</p>
-                      <p style={{ fontSize: '14px', color: '#6B7280' }}><strong>Time:</strong> {r.timeframe}</p>
+            {analysis.quickWins && analysis.quickWins.length > 0 && (
+              <div style={{ backgroundColor: '#DBEAFE', borderRadius: '12px', padding: '24px', marginBottom: '24px', border: '1px solid #BFDBFE' }}>
+                <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#1E40AF', marginBottom: '16px' }}>⚡ Quick Wins</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '12px' }}>
+                  {analysis.quickWins.map((w, i) => (
+                    <div key={i} style={{ backgroundColor: 'white', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', color: '#1E40AF' }}>
+                      ✨ {w}
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                  <div style={{ backgroundColor: '#F3F4F6', borderRadius: '12px', padding: '24px' }}>
-                    <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>🎯 Strategy</h4>
-                    <p style={{ fontSize: '14px', color: '#374151', lineHeight: '1.6' }}>{aiInsights.longTermStrategy}</p>
-                  </div>
-                  <div style={{ backgroundColor: '#FEF3C7', borderRadius: '12px', padding: '24px' }}>
-                    <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>💡 Insights</h4>
-                    <p style={{ fontSize: '14px', color: '#374151', lineHeight: '1.6' }}>{aiInsights.industryInsights}</p>
-                  </div>
+            {analysis.criticalIssues && analysis.criticalIssues.length > 0 && (
+              <div style={{ backgroundColor: '#FEE2E2', borderRadius: '12px', padding: '24px', marginBottom: '24px', border: '1px solid #FECACA' }}>
+                <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#991B1B', marginBottom: '16px' }}>🚨 Critical Issues</h4>
+                {analysis.criticalIssues.map((issue, i) => (
+                  <p key={i} style={{ fontSize: '14px', color: '#991B1B', marginBottom: '8px' }}>• {issue}</p>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+              {analysis.competitivePosition && (
+                <div style={{ backgroundColor: '#F3F4F6', borderRadius: '12px', padding: '24px' }}>
+                  <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>🎯 Competitive Position</h4>
+                  <p style={{ fontSize: '14px', color: '#374151', lineHeight: '1.6' }}>{analysis.competitivePosition}</p>
                 </div>
+              )}
+              {analysis.potentialImpact && (
+                <div style={{ backgroundColor: '#FEF3C7', borderRadius: '12px', padding: '24px' }}>
+                  <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>💡 Potential Impact</h4>
+                  <p style={{ fontSize: '14px', color: '#374151', lineHeight: '1.6' }}>{analysis.potentialImpact}</p>
+                </div>
+              )}
+            </div>
+
+            {analysis.nextSteps && analysis.nextSteps.length > 0 && (
+              <div style={{ backgroundColor: 'white', border: '2px solid #E5E7EB', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
+                <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '16px' }}>📋 Next Steps</h4>
+                {analysis.nextSteps.map((step, i) => (
+                  <div key={i} style={{ padding: '12px', backgroundColor: '#F9FAFB', borderRadius: '8px', marginBottom: '8px', borderLeft: '4px solid #2563EB' }}>
+                    <p style={{ fontSize: '14px', color: '#374151' }}>{i + 1}. {step}</p>
+                  </div>
+                ))}
+                {analysis.estimatedTimeToImprove && (
+                  <p style={{ fontSize: '14px', color: '#6B7280', marginTop: '16px', fontStyle: 'italic' }}>
+                    ⏱️ Estimated time to improve: {analysis.estimatedTimeToImprove}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -339,6 +363,13 @@ const GBPAnalyzer = () => {
               <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>Manual Analysis</h2>
               <p style={{ color: '#6B7280' }}>🤖 Powered by Claude AI</p>
             </div>
+            
+            {error && (
+              <div style={{ maxWidth: '600px', margin: '0 auto 24px', padding: '16px', backgroundColor: '#FEE2E2', borderRadius: '12px', color: '#991B1B', fontSize: '14px' }}>
+                ⚠️ {error}
+              </div>
+            )}
+            
             <div style={{ maxWidth: '600px', margin: '0 auto' }}>
               <div style={{ marginBottom: '24px' }}>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Business Name *</label>
@@ -417,7 +448,7 @@ const GBPAnalyzer = () => {
                     </button>
                   </div>
                   {searchResults.map((p) => (
-                    <div key={p.place_id} style={{ border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px', marginBottom: '16px' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}>
+                    <div key={p.place_id} style={{ border: '1px solid #E5E7EB', borderRadius: '12px', padding: '20px', marginBottom: '16px', backgroundColor: 'white' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '16px' }}>
                         <div style={{ flex: 1 }}>
                           <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '8px' }}>{p.name}</h4>
