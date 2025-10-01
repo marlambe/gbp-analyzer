@@ -18,6 +18,18 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required data' });
     }
 
+    // CRITICAL DEBUG LOGGING
+    console.log('========================================');
+    console.log('BUSINESS BEING ANALYZED:', businessName);
+    console.log('Rating:', placeDetails.rating || 0);
+    console.log('Review Count:', placeDetails.user_ratings_total || placeDetails.reviewCount || 0);
+    console.log('Photo Count:', placeDetails.photos?.length || placeDetails.photoCount || 0);
+    console.log('Has Website:', !!(placeDetails.website || placeDetails.hasWebsite));
+    console.log('Has Phone:', !!(placeDetails.formatted_phone_number || placeDetails.hasPhone));
+    console.log('Categories:', placeDetails.types);
+    console.log('Reviews available:', placeDetails.reviews?.length || 0);
+    console.log('========================================');
+
     // Enhanced prompt that forces AI to analyze the SPECIFIC data
     const prompt = `You are an expert local SEO consultant analyzing a Google Business Profile. You must provide a STRICT, DATA-DRIVEN analysis based ONLY on the specific metrics provided below.
 
@@ -25,6 +37,173 @@ BUSINESS TO ANALYZE:
 Business Name: ${businessName}
 Data Source: ${dataSource}
 Location: ${placeDetails.location || placeDetails.formatted_address || 'Not specified'}
+
+CRITICAL - USE THESE EXACT NUMBERS IN YOUR CALCULATIONS:
+================================
+Rating: ${placeDetails.rating || 0} stars out of 5
+Total Reviews: ${placeDetails.user_ratings_total || placeDetails.reviewCount || 0}
+Total Photos: ${placeDetails.photos?.length || placeDetails.photoCount || 0}
+Has Website: ${placeDetails.website || placeDetails.hasWebsite ? 'YES' : 'NO'}
+Has Phone: ${placeDetails.formatted_phone_number || placeDetails.hasPhone ? 'YES' : 'NO'}
+Has Hours: ${placeDetails.opening_hours || placeDetails.hasHours ? 'YES' : 'NO'}
+Business Status: ${placeDetails.business_status || 'Unknown'}
+Business Categories: ${placeDetails.types ? placeDetails.types.join(', ') : 'Not specified'}
+================================
+
+EXAMPLE CALCULATIONS YOU MUST FOLLOW:
+
+For Rating Score (max 30 points):
+- If rating is ${placeDetails.rating || 0} and it's >= 4.8: give 30 points
+- If rating is ${placeDetails.rating || 0} and it's 4.5-4.7: give 25 points
+- If rating is ${placeDetails.rating || 0} and it's 4.0-4.4: give 20 points
+- If rating is ${placeDetails.rating || 0} and it's 3.5-3.9: give 15 points
+- If rating is ${placeDetails.rating || 0} and it's below 3.5: give 10 points
+
+For Review Count Score (max 35 points):
+- If review count is ${placeDetails.user_ratings_total || placeDetails.reviewCount || 0} and it's >= 200: give 35 points
+- If review count is ${placeDetails.user_ratings_total || placeDetails.reviewCount || 0} and it's 100-199: give 28 points
+- If review count is ${placeDetails.user_ratings_total || placeDetails.reviewCount || 0} and it's 50-99: give 21 points
+- If review count is ${placeDetails.user_ratings_total || placeDetails.reviewCount || 0} and it's 25-49: give 14 points
+- If review count is ${placeDetails.user_ratings_total || placeDetails.reviewCount || 0} and it's 10-24: give 7 points
+- If review count is ${placeDetails.user_ratings_total || placeDetails.reviewCount || 0} and it's below 10: give 3 points
+
+For Photo Score (max 100 points):
+- If photo count is ${placeDetails.photos?.length || placeDetails.photoCount || 0} and it's >= 50: give 100 points
+- If photo count is ${placeDetails.photos?.length || placeDetails.photoCount || 0} and it's 30-49: give 80 points
+- If photo count is ${placeDetails.photos?.length || placeDetails.photoCount || 0} and it's 20-29: give 60 points
+- If photo count is ${placeDetails.photos?.length || placeDetails.photoCount || 0} and it's 10-19: give 40 points
+- If photo count is ${placeDetails.photos?.length || placeDetails.photoCount || 0} and it's below 10: give (count × 3) points
+
+SHOW YOUR WORK:
+You must calculate each score step by step and show the calculation in your response.
+Example: "Rating is 4.2, which falls in 4.0-4.4 range = 20 points"
+
+${placeDetails.reviews ? `
+REVIEW DATA FOR VELOCITY CALCULATION:
+${placeDetails.reviews.map((r, i) => `Review ${i + 1}: ${r.relative_time_description} (timestamp: ${r.time})`).join('\n')}
+
+Calculate reviews per month:
+- Count reviews in last 30 days
+- Count reviews in last 90 days  
+- Calculate average per month
+` : 'No review timestamp data available'}
+
+${placeDetails.reviews ? `
+REVIEW TEXT FOR KEYWORD/SENTIMENT ANALYSIS:
+${placeDetails.reviews.slice(0, 5).map((r, i) => `
+Review ${i + 1} (${r.rating} stars):
+"${r.text}"
+`).join('\n')}
+
+Extract specific keywords and assess sentiment from the text above.
+` : 'No review text available'}
+
+YOUR TASK:
+1. Calculate the EXACT scores using the formulas above
+2. Show your calculation work
+3. Business A with 150 reviews MUST score differently than Business B with 20 reviews
+4. Business with 4.8 rating MUST score higher than business with 3.5 rating
+5. Provide specific recommendations based on WHAT IS MISSING
+
+Respond ONLY with valid JSON (no markdown):
+{
+  "overallScore": <number>,
+  "calculationNotes": {
+    "rating": "Rating ${placeDetails.rating || 0} = X points because...",
+    "reviewCount": "Review count ${placeDetails.user_ratings_total || placeDetails.reviewCount || 0} = Y points because...",
+    "photos": "Photo count ${placeDetails.photos?.length || placeDetails.photoCount || 0} = Z points because..."
+  },
+  "categories": [
+    {
+      "name": "Category Optimization",
+      "score": <number 0-100>,
+      "weight": 20,
+      "issues": ["specific category issues"],
+      "strengths": ["category strengths"],
+      "recommendations": ["specific category changes"],
+      "categoryAnalysis": {
+        "primaryCategory": "${placeDetails.types?.[0] || 'Unknown'}",
+        "primaryCategoryScore": <number>,
+        "suggestedPrimaryCategory": "<specific suggestion>",
+        "additionalCategories": ${JSON.stringify(placeDetails.types || [])},
+        "categoryKeywordAlignment": "<analysis>"
+      }
+    },
+    {
+      "name": "Profile Completion",
+      "score": <calculated based on what they have>,
+      "weight": 20,
+      "issues": ["missing: ${!placeDetails.website && !placeDetails.hasWebsite ? 'website, ' : ''}${!placeDetails.formatted_phone_number && !placeDetails.hasPhone ? 'phone, ' : ''}${!placeDetails.opening_hours && !placeDetails.hasHours ? 'hours' : ''}"],
+      "strengths": ["has: ${placeDetails.website || placeDetails.hasWebsite ? 'website, ' : ''}${placeDetails.formatted_phone_number || placeDetails.hasPhone ? 'phone, ' : ''}${placeDetails.opening_hours || placeDetails.hasHours ? 'hours' : ''}"],
+      "recommendations": ["complete missing fields"]
+    },
+    {
+      "name": "Reviews & Ratings",
+      "score": <must be calculated from rating + review count + velocity>,
+      "weight": 35,
+      "issues": ["specific issues based on ${placeDetails.rating || 0} rating and ${placeDetails.user_ratings_total || placeDetails.reviewCount || 0} reviews"],
+      "strengths": ["strengths based on actual data"],
+      "recommendations": ["specific actions"],
+      "reviewVelocity": {
+        "reviewsPerMonth": <calculated number>,
+        "reviewsLast30Days": <count from timestamps>,
+        "reviewsLast90Days": <count from timestamps>,
+        "velocityScore": <0-100>,
+        "velocityRating": "<excellent/good/acceptable/poor/critical>",
+        "trend": "<analysis>"
+      },
+      "keywordAnalysis": {
+        "topKeywords": ["<from actual review text>"],
+        "relevanceScore": <0-100>,
+        "sentimentScore": <0-100>,
+        "sentimentBreakdown": {
+          "positive": <percentage>,
+          "neutral": <percentage>,
+          "negative": <percentage>
+        },
+        "keyInsights": ["<from review text>"]
+      }
+    },
+    {
+      "name": "Photos & Visual Content",
+      "score": <calculated from ${placeDetails.photos?.length || placeDetails.photoCount || 0} photos>,
+      "weight": 15,
+      "issues": ["needs ${Math.max(0, 20 - (placeDetails.photos?.length || placeDetails.photoCount || 0))} more photos to reach minimum"],
+      "strengths": ["has ${placeDetails.photos?.length || placeDetails.photoCount || 0} photos"],
+      "recommendations": ["upload specific number of photos"]
+    },
+    {
+      "name": "Engagement & Activity",
+      "score": <calculated>,
+      "weight": 10,
+      "issues": ["specific engagement issues"],
+      "strengths": ["engagement strengths"],
+      "recommendations": ["engagement actions"]
+    }
+  ],
+  "quickWins": ["<3-5 specific actions>"],
+  "criticalIssues": ["<based on lowest scores>"],
+  "reviewInsights": {
+    "summary": "<from actual review text>",
+    "commonPraise": ["<from reviews>"],
+    "commonComplaints": ["<from reviews>"],
+    "keywordOpportunities": ["<from reviews>"],
+    "sentimentTrend": "<analysis>",
+    "competitiveAdvantages": ["<from reviews>"]
+  },
+  "competitivePosition": "<based on actual numbers>",
+  "potentialImpact": "<realistic projection>",
+  "nextSteps": ["<specific prioritized actions>"],
+  "estimatedTimeToImprove": "<realistic timeframe>"
+}
+
+CRITICAL REMINDERS:
+- Rating: ${placeDetails.rating || 0}/5 - USE THIS EXACT NUMBER
+- Reviews: ${placeDetails.user_ratings_total || placeDetails.reviewCount || 0} - USE THIS EXACT NUMBER
+- Photos: ${placeDetails.photos?.length || placeDetails.photoCount || 0} - USE THIS EXACT NUMBER
+- Different numbers MUST produce different scores
+- Show your calculation work in calculationNotes
+- Be specific about ${businessName}'s exact situation`;
 
 ACTUAL BUSINESS DATA (USE THESE EXACT NUMBERS):
 - Current Rating: ${placeDetails.rating || 0}/5 stars
