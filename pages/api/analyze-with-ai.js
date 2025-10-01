@@ -12,53 +12,97 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { businessName, businessData, dataSource } = req.body;
+    const { businessName, placeDetails, dataSource } = req.body;
     
-    if (!businessName || !businessData) {
+    if (!businessName) {
       return res.status(400).json({ error: 'Missing required data' });
     }
 
-    // Prepare the prompt for Claude
-    const prompt = `You are a local SEO expert analyzing a Google Business Profile. Provide actionable, specific recommendations.
+    // Prepare comprehensive prompt for AI scoring
+    const prompt = `You are an expert local SEO analyst. Analyze this Google Business Profile and provide STRICT, REALISTIC scoring. Most businesses should score 40-65/100 to reflect real optimization opportunities.
 
 Business: ${businessName}
 Data Source: ${dataSource}
 
-Business Data:
-- Rating: ${businessData.rating || 'N/A'}/5
-- Total Reviews: ${businessData.reviewCount || 'N/A'}
-- Photos: ${businessData.photoCount || 'N/A'}
-- Has Website: ${businessData.hasWebsite ? 'Yes' : 'No'}
-- Has Phone: ${businessData.hasPhone ? 'Yes' : 'No'}
-- Has Hours: ${businessData.hasHours ? 'Yes' : 'No'}
-${businessData.address ? `- Address: ${businessData.address}` : ''}
+COMPLETE BUSINESS DATA:
+${JSON.stringify(placeDetails, null, 2)}
 
-Current Scores:
-${businessData.categories ? businessData.categories.map(cat => `- ${cat.name}: ${cat.score}/100`).join('\n') : ''}
+SCORING INSTRUCTIONS:
+- Be STRICT and REALISTIC - most businesses have significant room for improvement
+- Score on 0-100 scale for each category
+- Typical good businesses should score 60-70/100 overall
+- Only exceptional, fully-optimized profiles score 80+
+- Consider industry standards and competitive benchmarks
+- Weight issues by their SEO impact
 
-Provide a detailed analysis in JSON format with this structure:
+CATEGORIES TO SCORE:
+1. Profile Completion (25% of total) - NAP data, hours, website, description, attributes
+2. Reviews & Ratings (35% of total) - Volume, recency, rating, owner responses
+3. Photos & Visual Content (20% of total) - Quantity, quality, diversity, recency
+4. Engagement & Activity (10% of total) - Posts, Q&A responses, updates
+5. Local SEO Optimization (10% of total) - Categories, keywords, consistency
+
+Respond with ONLY valid JSON in this exact structure:
 {
-  "strengths": ["array of 2-3 specific strengths"],
-  "weaknesses": ["array of 2-3 specific weaknesses"],
-  "recommendations": [
+  "overallScore": number (0-100, be strict),
+  "categories": [
     {
-      "category": "category name",
-      "priority": "High/Medium/Low",
-      "action": "specific action to take",
-      "impact": "expected impact",
-      "timeframe": "how long it will take"
+      "name": "Profile Completion",
+      "score": number (0-100),
+      "weight": 25,
+      "issues": ["specific issues found"],
+      "strengths": ["what's done well"],
+      "recommendations": ["specific actions"]
+    },
+    {
+      "name": "Reviews & Ratings",
+      "score": number (0-100),
+      "weight": 35,
+      "issues": ["specific issues"],
+      "strengths": ["strengths"],
+      "recommendations": ["actions"]
+    },
+    {
+      "name": "Photos & Visual Content",
+      "score": number (0-100),
+      "weight": 20,
+      "issues": ["issues"],
+      "strengths": ["strengths"],
+      "recommendations": ["actions"]
+    },
+    {
+      "name": "Engagement & Activity",
+      "score": number (0-100),
+      "weight": 10,
+      "issues": ["issues"],
+      "strengths": ["strengths"],
+      "recommendations": ["actions"]
+    },
+    {
+      "name": "Local SEO Optimization",
+      "score": number (0-100),
+      "weight": 10,
+      "issues": ["issues"],
+      "strengths": ["strengths"],
+      "recommendations": ["actions"]
     }
   ],
-  "quickWins": ["array of 2-3 quick actions that can be done today"],
-  "longTermStrategy": "paragraph describing 3-6 month strategy",
-  "industryInsights": "brief paragraph with industry-specific advice"
+  "quickWins": ["3-5 immediate actions with biggest impact"],
+  "criticalIssues": ["most urgent problems"],
+  "competitivePosition": "brief assessment vs typical competitors",
+  "potentialImpact": "what improvements could achieve",
+  "nextSteps": ["prioritized 5-7 action items"],
+  "estimatedTimeToImprove": "realistic timeframe (e.g., 2-3 months)"
 }
 
-Make recommendations specific, actionable, and prioritized. Focus on what will have the biggest impact on local search rankings.
+IMPORTANT: 
+- Be STRICT with scoring - reflect real opportunities for improvement
+- Most businesses should score 40-65/100
+- Only truly exceptional profiles score 75+
+- Provide specific, actionable recommendations
+- Consider the business type and industry standards
+- Output ONLY valid JSON, no markdown or explanations`;
 
-IMPORTANT: Respond ONLY with valid JSON. Do not include any markdown formatting or code blocks.`;
-
-    // Call Claude API
     const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -66,7 +110,7 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any markdown formatting 
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
+        max_tokens: 3000,
         messages: [
           { 
             role: "user", 
@@ -83,10 +127,8 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any markdown formatting 
     const claudeData = await claudeResponse.json();
     let aiResponse = claudeData.content[0].text;
     
-    // Clean up the response (remove markdown code blocks if present)
     aiResponse = aiResponse.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     
-    // Parse the JSON response
     const aiAnalysis = JSON.parse(aiResponse);
     
     res.status(200).json({
@@ -97,35 +139,24 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any markdown formatting 
   } catch (error) {
     console.error('AI Analysis error:', error);
     
-    // Return fallback analysis if Claude fails
+    // Fallback with strict scoring
     res.status(200).json({
       success: true,
       aiAnalysis: {
-        strengths: ["Profile is active and operational", "Has basic information configured"],
-        weaknesses: ["Could improve review generation", "May need more visual content"],
-        recommendations: [
-          {
-            category: "Reviews",
-            priority: "High",
-            action: "Set up automated review request system",
-            impact: "Increase review volume by 50-100%",
-            timeframe: "1-2 weeks"
-          },
-          {
-            category: "Photos",
-            priority: "Medium",
-            action: "Add diverse, high-quality photos",
-            impact: "Improve engagement and click-through rates",
-            timeframe: "1 week"
-          }
+        overallScore: 45,
+        categories: [
+          { name: "Profile Completion", score: 55, weight: 25, issues: ["Missing key elements"], strengths: ["Basic info present"], recommendations: ["Complete all fields"] },
+          { name: "Reviews & Ratings", score: 40, weight: 35, issues: ["Low review volume"], strengths: [], recommendations: ["Implement review strategy"] },
+          { name: "Photos & Visual Content", score: 35, weight: 20, issues: ["Insufficient photos"], strengths: [], recommendations: ["Add 20+ diverse photos"] },
+          { name: "Engagement & Activity", score: 30, weight: 10, issues: ["No recent activity"], strengths: [], recommendations: ["Start posting weekly"] },
+          { name: "Local SEO Optimization", score: 50, weight: 10, issues: ["Needs audit"], strengths: [], recommendations: ["Full SEO audit needed"] }
         ],
-        quickWins: [
-          "Upload 5-10 new high-quality photos today",
-          "Respond to all pending customer reviews",
-          "Update business hours if they've changed"
-        ],
-        longTermStrategy: "Focus on consistently generating new reviews, maintaining fresh visual content, and engaging with customer questions. Monitor competitors and stay updated with local SEO best practices.",
-        industryInsights: "Local businesses that respond to reviews see 35% higher engagement. Regular posting and photo updates signal to Google that your business is active and trustworthy."
+        quickWins: ["Upload 10 photos today", "Respond to all reviews", "Post weekly updates"],
+        criticalIssues: ["Low review count", "Insufficient photos", "No engagement"],
+        competitivePosition: "Below average - significant optimization needed",
+        potentialImpact: "Could increase visibility 50-100% with proper optimization",
+        nextSteps: ["Set up review generation", "Photo strategy", "Weekly posting schedule", "NAP audit", "Competitor analysis"],
+        estimatedTimeToImprove: "2-3 months with consistent effort"
       }
     });
   }
