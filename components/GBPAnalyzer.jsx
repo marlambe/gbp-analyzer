@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 
 const GBPAnalyzer = () => {
   const [analysisMode, setAnalysisMode] = useState('manual');
-  const [apiKey, setApiKey] = useState('');
-  const [showApiSetup, setShowApiSetup] = useState(false);
   const [businessName, setBusinessName] = useState('');
   const [location, setLocation] = useState('');
   const [manualData, setManualData] = useState({
@@ -38,7 +36,7 @@ const GBPAnalyzer = () => {
       const response = await fetch('/api/search-business', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businessName, location, apiKey })
+        body: JSON.stringify({ businessName, location })
       });
 
       const data = await response.json();
@@ -49,7 +47,7 @@ const GBPAnalyzer = () => {
           setError('No businesses found. Try different search terms.');
         }
       } else {
-        setError(data.error || 'Search failed. Please check your API key.');
+        setError(data.error || 'Search failed. Please try again.');
       }
     } catch (err) {
       setError('Search failed. Please try again.');
@@ -67,7 +65,7 @@ const GBPAnalyzer = () => {
       const response = await fetch('/api/get-place-details', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ placeId, apiKey })
+        body: JSON.stringify({ placeId })
       });
 
       const data = await response.json();
@@ -336,34 +334,17 @@ const GBPAnalyzer = () => {
     <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom right, #EFF6FF, #E0E7FF)' }}>
       <div style={{ backgroundColor: 'white', borderBottom: '1px solid #E5E7EB' }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '40px', height: '40px', backgroundColor: '#2563EB', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '20px' }}>📍</div>
-              <div>
-                <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#111827', margin: 0 }}>GBP Strength Analyzer</h1>
-                <p style={{ color: '#6B7280', margin: 0 }}>Optimize your Google Business Profile</p>
-              </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '40px', height: '40px', backgroundColor: '#2563EB', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '20px' }}>📍</div>
+            <div>
+              <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#111827', margin: 0 }}>GBP Strength Analyzer</h1>
+              <p style={{ color: '#6B7280', margin: 0 }}>Optimize your Google Business Profile for better local SEO</p>
             </div>
-            <button onClick={() => setShowApiSetup(!showApiSetup)} style={{ padding: '8px 16px', backgroundColor: '#F3F4F6', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
-              ⚙️ API Setup
-            </button>
           </div>
         </div>
       </div>
 
       <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '32px 20px' }}>
-        {showApiSetup && (
-          <div style={{ backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', padding: '24px', marginBottom: '32px', borderLeft: '4px solid #10B981' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>🔑 Google Places API Setup</h3>
-            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '16px' }}>Add your Google Places API key for real-time business data analysis.</p>
-            <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Enter your Google Places API key" style={{ width: '100%', padding: '12px', border: '1px solid #D1D5DB', borderRadius: '8px', marginBottom: '12px' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: '14px', color: '#2563EB', textDecoration: 'underline' }}>Get API Key →</a>
-              <button onClick={() => setShowApiSetup(false)} style={{ padding: '8px 16px', backgroundColor: '#F3F4F6', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}>Close</button>
-            </div>
-          </div>
-        )}
-
         <div style={{ backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', padding: '40px', marginBottom: '32px' }}>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#111827', textAlign: 'center', marginBottom: '32px' }}>Choose Your Analysis Method</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '32px' }}>
@@ -373,33 +354,14 @@ const GBPAnalyzer = () => {
                 <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', marginBottom: '8px' }}>Manual Input</h3>
                 <p style={{ fontSize: '14px', color: '#6B7280' }}>Quick analysis based on your input</p>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px' }}>
-                <span style={{ color: '#6B7280' }}>Speed:</span><span style={{ fontWeight: '600', color: '#10B981' }}>Fast ⚡</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px' }}>
-                <span style={{ color: '#6B7280' }}>Accuracy:</span><span style={{ fontWeight: '600', color: '#F59E0B' }}>Medium 📊</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                <span style={{ color: '#6B7280' }}>Cost:</span><span style={{ fontWeight: '600', color: '#10B981' }}>Free 💚</span>
-              </div>
             </div>
 
-            <div onClick={() => apiKey && setAnalysisMode('api')} style={{ border: analysisMode === 'api' ? '2px solid #10B981' : '2px solid #E5E7EB', backgroundColor: analysisMode === 'api' ? '#ECFDF5' : apiKey ? 'white' : '#F9FAFB', borderRadius: '12px', padding: '24px', cursor: apiKey ? 'pointer' : 'not-allowed', opacity: apiKey ? 1 : 0.6, transition: 'all 0.2s' }}>
+            <div onClick={() => setAnalysisMode('api')} style={{ border: analysisMode === 'api' ? '2px solid #10B981' : '2px solid #E5E7EB', backgroundColor: analysisMode === 'api' ? '#ECFDF5' : 'white', borderRadius: '12px', padding: '24px', cursor: 'pointer', transition: 'all 0.2s' }}>
               <div style={{ textAlign: 'center', marginBottom: '16px' }}>
                 <div style={{ fontSize: '48px', marginBottom: '12px' }}>🔍</div>
                 <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', marginBottom: '8px' }}>Google Places API</h3>
-                <p style={{ fontSize: '14px', color: '#6B7280' }}>Real-time official Google data</p>
+                <p style={{ fontSize: '14px', color: '#6B7280' }}>Real-time official Google data analysis</p>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px' }}>
-                <span style={{ color: '#6B7280' }}>Speed:</span><span style={{ fontWeight: '600', color: '#2563EB' }}>Medium ⏱️</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px' }}>
-                <span style={{ color: '#6B7280' }}>Accuracy:</span><span style={{ fontWeight: '600', color: '#10B981' }}>High 🎯</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                <span style={{ color: '#6B7280' }}>Cost:</span><span style={{ fontWeight: '600', color: '#2563EB' }}>$200 Free/Mo 💎</span>
-              </div>
-              {!apiKey && <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#FEF3C7', borderRadius: '8px', textAlign: 'center', fontSize: '12px', color: '#92400E' }}>Add API key above to enable</div>}
             </div>
           </div>
         </div>
@@ -481,7 +443,7 @@ const GBPAnalyzer = () => {
               </div>
 
               {searchResults.length === 0 ? (
-                <button onClick={searchWithAPI} disabled={!businessName || !location || !apiKey || isSearching} style={{ width: '100%', backgroundColor: '#10B981', color: 'white', padding: '16px', borderRadius: '12px', border: 'none', cursor: (!businessName || !location || !apiKey || isSearching) ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '18px', opacity: (!businessName || !location || !apiKey || isSearching) ? 0.5 : 1 }}>
+                <button onClick={searchWithAPI} disabled={!businessName || !location || isSearching} style={{ width: '100%', backgroundColor: '#10B981', color: 'white', padding: '16px', borderRadius: '12px', border: 'none', cursor: (!businessName || !location || isSearching) ? 'not-allowed' : 'pointer', fontWeight: '600', fontSize: '18px', opacity: (!businessName || !location || isSearching) ? 0.5 : 1 }}>
                   {isSearching ? '🔄 Searching Google...' : '🔍 Search with Google Places API'}
                 </button>
               ) : (
