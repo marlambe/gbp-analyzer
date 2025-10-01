@@ -12,108 +12,33 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { placeId } = req.body;
+    const { businessName, location } = req.body;
     
-    if (!placeId) {
-      return res.status(400).json({ error: 'Place ID required' });
+    if (!businessName || !location) {
+      return res.status(400).json({ error: 'Business name and location required' });
     }
 
     const googleApiKey = process.env.GOOGLE_PLACES_API_KEY;
     
     if (!googleApiKey) {
-      return res.status(500).json({ error: 'API key not configured' });
+      return res.status(500).json({ error: 'API key not configured on server' });
     }
 
-    // Using OLD Google Places API for maximum compatibility
-    // Request all available fields
-    const fields = [
-      // Basic Information
-      'place_id',
-      'name',
-      'formatted_address',
-      'formatted_phone_number',
-      'international_phone_number',
-      'website',
-      'url',
-      'business_status',
-      'types',
-      
-      // Reviews & Ratings
-      'rating',
-      'user_ratings_total',
-      'reviews',
-      
-      // Photos
-      'photos',
-      
-      // Hours
-      'opening_hours',
-      'current_opening_hours',
-      
-      // Pricing & Details
-      'price_level',
-      'editorial_summary',
-      
-      // Accessibility
-      'wheelchair_accessible_entrance',
-      
-      // Service Options (what's available in old API)
-      'delivery',
-      'dine_in',
-      'takeout',
-      'reservable',
-      'serves_breakfast',
-      'serves_lunch',
-      'serves_dinner',
-      'serves_brunch',
-      'serves_beer',
-      'serves_wine',
-      'serves_vegetarian_food',
-      'curbside_pickup',
-      
-      // Location
-      'geometry',
-      'vicinity',
-      'plus_code',
-      
-      // Other
-      'icon',
-      'icon_background_color',
-      'icon_mask_base_uri',
-      'utc_offset'
-    ].join(',');
+    // Using OLD Google Places API for compatibility
+    const query = encodeURIComponent(`${businessName} ${location}`);
+    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${query}&key=${googleApiKey}`;
     
-    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=${fields}&key=${googleApiKey}`;
-    
-    console.log('Fetching place details for:', placeId);
+    console.log('Searching for:', `${businessName} ${location}`);
     
     const response = await fetch(url);
     const data = await response.json();
     
     if (data.status === 'OK') {
-      // Log key metrics for debugging
-      console.log('=== PLACE DETAILS FETCHED ===');
-      console.log('Business:', data.result.name);
-      console.log('Rating:', data.result.rating);
-      console.log('Reviews:', data.result.user_ratings_total);
-      console.log('Photos:', data.result.photos?.length || 0);
-      console.log('Has Website:', !!data.result.website);
-      console.log('Has Phone:', !!data.result.formatted_phone_number);
-      console.log('Has Hours:', !!data.result.opening_hours);
-      console.log('Business Status:', data.result.business_status);
-      console.log('Types:', data.result.types);
-      console.log('Attributes:', {
-        delivery: data.result.delivery,
-        dine_in: data.result.dine_in,
-        takeout: data.result.takeout,
-        reservable: data.result.reservable,
-        wheelchair_accessible: data.result.wheelchair_accessible_entrance
-      });
-      console.log('============================');
+      console.log(`Found ${data.results.length} results`);
       
       res.status(200).json({
         success: true,
-        result: data.result
+        results: data.results.slice(0, 5)
       });
     } else {
       console.error('Google Places API Error:', data.status, data.error_message);
@@ -123,7 +48,7 @@ export default async function handler(req, res) {
       });
     }
   } catch (error) {
-    console.error('Get details error:', error);
+    console.error('Search error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error: ' + error.message
