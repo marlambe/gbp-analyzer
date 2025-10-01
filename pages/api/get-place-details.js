@@ -12,129 +12,89 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { placeId } = req.body;
+    const { businessName, location } = req.body;
     
-    if (!placeId) {
-      return res.status(400).json({ error: 'Place ID required' });
+    if (!businessName || !location) {
+      return res.status(400).json({ error: 'Business name and location required' });
     }
 
     const googleApiKey = process.env.GOOGLE_PLACES_API_KEY;
     
     if (!googleApiKey) {
-      return res.status(500).json({ error: 'API key not configured' });
+      return res.status(500).json({ error: 'API key not configured on server' });
     }
 
-    // Request ALL available fields for comprehensive analysis
-    // Organized by category for clarity
-    const fields = [
-      // Basic Information
-      'place_id',
-      'name',
-      'formatted_address',
-      'formatted_phone_number',
-      'international_phone_number',
-      'website',
-      'url',
-      'business_status',
-      'types',
-      
-      // Reviews & Ratings
-      'rating',
-      'user_ratings_total',
-      'reviews',
-      
-      // Photos
-      'photos',
-      
-      // Hours
-      'opening_hours',
-      'current_opening_hours',
-      'secondary_opening_hours',
-      
-      // Pricing & Details
-      'price_level',
-      'editorial_summary',
-      
-      // Accessibility & Amenities
-      'wheelchair_accessible_entrance',
-      
-      // Service Options (Restaurant/Food specific)
-      'delivery',
-      'dine_in',
-      'takeout',
-      'reservable',
-      'serves_breakfast',
-      'serves_lunch',
-      'serves_dinner',
-      'serves_brunch',
-      'serves_beer',
-      'serves_wine',
-      'serves_vegetarian_food',
-      
-      // Additional Attributes
-      'curbside_pickup',
-      'outdoor_seating',
-      'live_music',
-      'restroom',
-      'good_for_children',
-      'good_for_groups',
-      'allows_dogs',
-      
-      // Location
-      'geometry',
-      'vicinity',
-      'plus_code',
-      
-      // Other
-      'icon',
-      'icon_background_color',
-      'icon_mask_base_uri',
-      'utc_offset'
-    ].join(',');
+    // Using NEW Google Places API (v1) - Text Search
+    const url = 'https://places.googleapis.com/v1/places:searchText';
     
-    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=${fields}&key=${googleApiKey}`;
+    const requestBody = {
+      textQuery: `${businessName} ${location}`,
+      maxResultCount: 5,
+      languageCode: 'en'
+    };
     
-    console.log('Fetching place details for:', placeId);
+    console.log('Searching for:', requestBody.textQuery);
     
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': googleApiKey,
+        'X-Goog-FieldMask': [
+          'places.id',
+          'places.displayName',
+          'places.formattedAddress',
+          'places.rating',
+          'places.userRatingCount',
+          'places.businessStatus',
+          'places.types',
+          'places.primaryType',
+          'places.location'
+        ].join(',')
+      },
+      body: JSON.stringify(requestBody)
+    });
+    
     const data = await response.json();
     
-    if (data.status === 'OK') {
-      // Log key metrics for debugging
-      console.log('=== PLACE DETAILS FETCHED ===');
-      console.log('Business:', data.result.name);
-      console.log('Rating:', data.result.rating);
-      console.log('Reviews:', data.result.user_ratings_total);
-      console.log('Photos:', data.result.photos?.length || 0);
-      console.log('Has Website:', !!data.result.website);
-      console.log('Has Phone:', !!data.result.formatted_phone_number);
-      console.log('Has Hours:', !!data.result.opening_hours);
-      console.log('Business Status:', data.result.business_status);
-      console.log('Attributes:', {
-        delivery: data.result.delivery,
-        dine_in: data.result.dine_in,
-        takeout: data.result.takeout,
-        reservable: data.result.reservable,
-        wheelchair_accessible: data.result.wheelchair_accessible_entrance
-      });
-      console.log('============================');
+    if (response.ok && data.places) {
+      // Transform new API format to match old format for backward compatibility
+      const transformedResults = data.places.map(place => ({
+        place_id: place.id,
+        name: place.displayName?.text || '',
+        formatted_address: place.formattedAddress || '',
+        vicinity: place.formattedAddress || '',
+        rating: place.rating || 0,
+        user_ratings_total: place.userRatingCount || 0,
+        business_status: place.businessStatus || 'OPERATIONAL',
+        types: place.types || [],
+        primary_type: place.primaryType || '',
+        geometry: {
+          location: place.location ? {
+            lat: place.location.latitude,
+            lng: place.location.longitude
+          } : null
+        }
+      }));
+      
+      console.log(`Found ${transformedResults.length} results`);
       
       res.status(200).json({
         success: true,
-        result: data.result
+        results: transformedResults
       });
     } else {
-      console.error('Google Places API Error:', data.status, data.error_message);
+      console.error('Google Places API Error:', response.status, data);
       res.status(400).json({
         success: false,
-        error: data.error_message || `API Error: ${data.status}`
+        error: data.error?.message || `API Error: ${response.status}`
       });
     }
   } catch (error) {
-    console.error('Get details error:', error);
+    console.error('Search error:', error);
     res.status(500).json({
       success: false,
-      error: 'Internal server error'
+      error: 'Internal server error: ' + error.message
     });
   }
 }
