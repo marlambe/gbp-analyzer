@@ -24,216 +24,102 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'API key not configured' });
     }
 
-    // Using NEW Google Places API (v1)
-    const url = `https://places.googleapis.com/v1/places/${placeId}`;
+    // Using OLD Google Places API for maximum compatibility
+    // Request all available fields
+    const fields = [
+      // Basic Information
+      'place_id',
+      'name',
+      'formatted_address',
+      'formatted_phone_number',
+      'international_phone_number',
+      'website',
+      'url',
+      'business_status',
+      'types',
+      
+      // Reviews & Ratings
+      'rating',
+      'user_ratings_total',
+      'reviews',
+      
+      // Photos
+      'photos',
+      
+      // Hours
+      'opening_hours',
+      'current_opening_hours',
+      
+      // Pricing & Details
+      'price_level',
+      'editorial_summary',
+      
+      // Accessibility
+      'wheelchair_accessible_entrance',
+      
+      // Service Options (what's available in old API)
+      'delivery',
+      'dine_in',
+      'takeout',
+      'reservable',
+      'serves_breakfast',
+      'serves_lunch',
+      'serves_dinner',
+      'serves_brunch',
+      'serves_beer',
+      'serves_wine',
+      'serves_vegetarian_food',
+      'curbside_pickup',
+      
+      // Location
+      'geometry',
+      'vicinity',
+      'plus_code',
+      
+      // Other
+      'icon',
+      'icon_background_color',
+      'icon_mask_base_uri',
+      'utc_offset'
+    ].join(',');
+    
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=${fields}&key=${googleApiKey}`;
     
     console.log('Fetching place details for:', placeId);
     
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': googleApiKey,
-        'X-Goog-FieldMask': [
-          // Basic Information
-          'id',
-          'displayName',
-          'formattedAddress',
-          'nationalPhoneNumber',
-          'internationalPhoneNumber',
-          'websiteUri',
-          'googleMapsUri',
-          'businessStatus',
-          'types',
-          'primaryType',
-          'primaryTypeDisplayName',
-          
-          // Reviews & Ratings
-          'rating',
-          'userRatingCount',
-          'reviews',
-          
-          // Photos
-          'photos',
-          
-          // Hours
-          'regularOpeningHours',
-          'currentOpeningHours',
-          
-          // Pricing
-          'priceLevel',
-          'editorialSummary',
-          
-          // Accessibility & Amenities
-          'accessibilityOptions',
-          
-          // Service Options
-          'delivery',
-          'dineIn',
-          'takeout',
-          'reservable',
-          'servesBreakfast',
-          'servesLunch',
-          'servesDinner',
-          'servesBrunch',
-          'servesBeer',
-          'servesWine',
-          'servesVegetarianFood',
-          
-          // Additional Attributes
-          'curbsidePickup',
-          'outdoorSeating',
-          'liveMusic',
-          'restroom',
-          'goodForChildren',
-          'goodForGroups',
-          'allowsDogs',
-          'goodForWatchingSports',
-          'paymentOptions',
-          'parkingOptions',
-          
-          // Location
-          'location',
-          'viewport',
-          'shortFormattedAddress',
-          
-          // Other
-          'iconMaskBaseUri',
-          'iconBackgroundColor',
-          'utcOffsetMinutes'
-        ].join(',')
-      }
-    });
-    
+    const response = await fetch(url);
     const data = await response.json();
     
-    if (response.ok && data) {
-      // Transform new API format to match old format for backward compatibility
-      const transformedData = {
-        place_id: data.id || placeId,
-        name: data.displayName?.text || '',
-        formatted_address: data.formattedAddress || data.shortFormattedAddress || '',
-        formatted_phone_number: data.nationalPhoneNumber || '',
-        international_phone_number: data.internationalPhoneNumber || '',
-        website: data.websiteUri || '',
-        url: data.googleMapsUri || '',
-        business_status: data.businessStatus || '',
-        types: data.types || [],
-        primary_type: data.primaryType || '',
-        
-        // Reviews & Ratings
-        rating: data.rating || 0,
-        user_ratings_total: data.userRatingCount || 0,
-        reviews: data.reviews ? data.reviews.map(r => ({
-          author_name: r.authorAttribution?.displayName || 'Anonymous',
-          author_url: r.authorAttribution?.uri || '',
-          rating: r.rating || 0,
-          text: r.text?.text || r.originalText?.text || '',
-          time: new Date(r.publishTime).getTime() / 1000, // Convert to Unix timestamp
-          relative_time_description: r.relativePublishTimeDescription || '',
-          reply: r.ownerReply ? {
-            text: r.ownerReply.text?.text || '',
-            time: new Date(r.ownerReply.publishTime).getTime() / 1000
-          } : null
-        })) : [],
-        
-        // Photos
-        photos: data.photos ? data.photos.map(p => ({
-          photo_reference: p.name,
-          height: p.heightPx || 0,
-          width: p.widthPx || 0,
-          html_attributions: p.authorAttributions || []
-        })) : [],
-        
-        // Hours
-        opening_hours: data.regularOpeningHours ? {
-          open_now: data.currentOpeningHours?.openNow || false,
-          periods: data.regularOpeningHours.periods || [],
-          weekday_text: data.regularOpeningHours.weekdayDescriptions || []
-        } : null,
-        current_opening_hours: data.currentOpeningHours || null,
-        
-        // Pricing & Details
-        price_level: data.priceLevel ? ['FREE', 'INEXPENSIVE', 'MODERATE', 'EXPENSIVE', 'VERY_EXPENSIVE'].indexOf(data.priceLevel) : null,
-        editorial_summary: data.editorialSummary?.text || null,
-        
-        // Accessibility & Amenities
-        wheelchair_accessible_entrance: data.accessibilityOptions?.wheelchairAccessibleEntrance || null,
-        
-        // Service Options
-        delivery: data.delivery,
-        dine_in: data.dineIn,
-        takeout: data.takeout,
-        reservable: data.reservable,
-        serves_breakfast: data.servesBreakfast,
-        serves_lunch: data.servesLunch,
-        serves_dinner: data.servesDinner,
-        serves_brunch: data.servesBrunch,
-        serves_beer: data.servesBeer,
-        serves_wine: data.servesWine,
-        serves_vegetarian_food: data.servesVegetarianFood,
-        
-        // Additional Attributes (NEW - only available in new API)
-        curbside_pickup: data.curbsidePickup,
-        outdoor_seating: data.outdoorSeating,
-        live_music: data.liveMusic,
-        restroom: data.restroom,
-        good_for_children: data.goodForChildren,
-        good_for_groups: data.goodForGroups,
-        allows_dogs: data.allowsDogs,
-        good_for_watching_sports: data.goodForWatchingSports,
-        payment_options: data.paymentOptions,
-        parking_options: data.parkingOptions,
-        
-        // Location
-        geometry: {
-          location: data.location ? {
-            lat: data.location.latitude,
-            lng: data.location.longitude
-          } : null,
-          viewport: data.viewport || null
-        },
-        vicinity: data.shortFormattedAddress || '',
-        
-        // Other
-        icon_background_color: data.iconBackgroundColor || '',
-        icon_mask_base_uri: data.iconMaskBaseUri || ''
-      };
-      
+    if (data.status === 'OK') {
       // Log key metrics for debugging
-      console.log('=== PLACE DETAILS FETCHED (NEW API) ===');
-      console.log('Business:', transformedData.name);
-      console.log('Rating:', transformedData.rating);
-      console.log('Reviews:', transformedData.user_ratings_total);
-      console.log('Photos:', transformedData.photos?.length || 0);
-      console.log('Has Website:', !!transformedData.website);
-      console.log('Has Phone:', !!transformedData.formatted_phone_number);
-      console.log('Has Hours:', !!transformedData.opening_hours);
-      console.log('Business Status:', transformedData.business_status);
-      console.log('Primary Type:', transformedData.primary_type);
+      console.log('=== PLACE DETAILS FETCHED ===');
+      console.log('Business:', data.result.name);
+      console.log('Rating:', data.result.rating);
+      console.log('Reviews:', data.result.user_ratings_total);
+      console.log('Photos:', data.result.photos?.length || 0);
+      console.log('Has Website:', !!data.result.website);
+      console.log('Has Phone:', !!data.result.formatted_phone_number);
+      console.log('Has Hours:', !!data.result.opening_hours);
+      console.log('Business Status:', data.result.business_status);
+      console.log('Types:', data.result.types);
       console.log('Attributes:', {
-        delivery: transformedData.delivery,
-        dine_in: transformedData.dine_in,
-        takeout: transformedData.takeout,
-        reservable: transformedData.reservable,
-        wheelchair_accessible: transformedData.wheelchair_accessible_entrance,
-        outdoor_seating: transformedData.outdoor_seating,
-        live_music: transformedData.live_music,
-        good_for_children: transformedData.good_for_children,
-        good_for_groups: transformedData.good_for_groups,
-        allows_dogs: transformedData.allows_dogs
+        delivery: data.result.delivery,
+        dine_in: data.result.dine_in,
+        takeout: data.result.takeout,
+        reservable: data.result.reservable,
+        wheelchair_accessible: data.result.wheelchair_accessible_entrance
       });
       console.log('============================');
       
       res.status(200).json({
         success: true,
-        result: transformedData
+        result: data.result
       });
     } else {
-      console.error('Google Places API Error:', response.status, data);
+      console.error('Google Places API Error:', data.status, data.error_message);
       res.status(400).json({
         success: false,
-        error: data.error?.message || `API Error: ${response.status}`
+        error: data.error_message || `API Error: ${data.status}`
       });
     }
   } catch (error) {
