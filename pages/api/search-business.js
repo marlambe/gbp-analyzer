@@ -12,16 +12,17 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { businessName, location, apiKey } = req.body;
+    const { businessName, location } = req.body;
     
     if (!businessName || !location) {
       return res.status(400).json({ error: 'Business name and location required' });
     }
 
-    const googleApiKey = apiKey || process.env.GOOGLE_PLACES_API_KEY;
+    // Use server-side API key from environment variables
+    const googleApiKey = process.env.GOOGLE_PLACES_API_KEY;
     
     if (!googleApiKey) {
-      return res.status(400).json({ error: 'Google Places API key required' });
+      return res.status(500).json({ error: 'API key not configured on server' });
     }
 
     const query = encodeURIComponent(`${businessName} ${location}`);
