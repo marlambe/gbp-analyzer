@@ -262,6 +262,69 @@ const GBPAnalyzer = () => {
               </div>
             )}
 
+            {analysis.reviewInsights && (
+              <div style={{ backgroundColor: '#F0FDF4', borderRadius: '12px', padding: '24px', marginBottom: '24px', border: '1px solid #BBF7D0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '24px' }}>💬</span>
+                  <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#166534' }}>Review Insights & Keyword Analysis</h4>
+                </div>
+                
+                {analysis.reviewInsights.summary && (
+                  <p style={{ fontSize: '15px', color: '#166534', marginBottom: '20px', padding: '12px', backgroundColor: 'white', borderRadius: '8px', fontStyle: 'italic' }}>
+                    "{analysis.reviewInsights.summary}"
+                  </p>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                  {analysis.reviewInsights.commonPraise && analysis.reviewInsights.commonPraise.length > 0 && (
+                    <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px' }}>
+                      <h5 style={{ fontSize: '15px', fontWeight: '600', color: '#15803D', marginBottom: '12px' }}>👍 What Customers Love</h5>
+                      {analysis.reviewInsights.commonPraise.map((praise, i) => (
+                        <p key={i} style={{ fontSize: '13px', color: '#166534', marginBottom: '6px' }}>✓ {praise}</p>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {analysis.reviewInsights.commonComplaints && analysis.reviewInsights.commonComplaints.length > 0 && (
+                    <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px' }}>
+                      <h5 style={{ fontSize: '15px', fontWeight: '600', color: '#B91C1C', marginBottom: '12px' }}>👎 Areas to Address</h5>
+                      {analysis.reviewInsights.commonComplaints.map((complaint, i) => (
+                        <p key={i} style={{ fontSize: '13px', color: '#991B1B', marginBottom: '6px' }}>• {complaint}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {analysis.reviewInsights.keywordOpportunities && analysis.reviewInsights.keywordOpportunities.length > 0 && (
+                  <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+                    <h5 style={{ fontSize: '15px', fontWeight: '600', color: '#166534', marginBottom: '12px' }}>🔑 Keyword Opportunities</h5>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      {analysis.reviewInsights.keywordOpportunities.map((keyword, i) => (
+                        <span key={i} style={{ backgroundColor: '#BBF7D0', color: '#166534', padding: '6px 12px', borderRadius: '16px', fontSize: '13px', fontWeight: '500' }}>
+                          {keyword}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {analysis.reviewInsights.competitiveAdvantages && analysis.reviewInsights.competitiveAdvantages.length > 0 && (
+                  <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px' }}>
+                    <h5 style={{ fontSize: '15px', fontWeight: '600', color: '#166534', marginBottom: '12px' }}>🌟 Competitive Advantages</h5>
+                    {analysis.reviewInsights.competitiveAdvantages.map((adv, i) => (
+                      <p key={i} style={{ fontSize: '13px', color: '#166534', marginBottom: '6px' }}>⭐ {adv}</p>
+                    ))}
+                  </div>
+                )}
+
+                {analysis.reviewInsights.sentimentTrend && (
+                  <p style={{ fontSize: '13px', color: '#166534', marginTop: '16px', textAlign: 'center', fontStyle: 'italic' }}>
+                    Sentiment Trend: {analysis.reviewInsights.sentimentTrend}
+                  </p>
+                )}
+              </div>
+            )}
+
             {analysis.criticalIssues && analysis.criticalIssues.length > 0 && (
               <div style={{ backgroundColor: '#FEE2E2', borderRadius: '12px', padding: '24px', marginBottom: '24px', border: '1px solid #FECACA' }}>
                 <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#991B1B', marginBottom: '16px' }}>🚨 Critical Issues</h4>
