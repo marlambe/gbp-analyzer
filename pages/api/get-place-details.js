@@ -18,14 +18,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Place ID required' });
     }
 
-    // Use server-side API key from environment variables
     const googleApiKey = process.env.GOOGLE_PLACES_API_KEY;
     
     if (!googleApiKey) {
-      return res.status(500).json({ error: 'API key not configured on server' });
+      return res.status(500).json({ error: 'API key not configured' });
     }
 
-    const fields = 'name,formatted_address,formatted_phone_number,website,rating,user_ratings_total,opening_hours,photos,reviews,business_status';
+    // Request ALL available fields for comprehensive analysis
+    const fields = 'name,formatted_address,formatted_phone_number,website,rating,user_ratings_total,price_level,opening_hours,photos,reviews,business_status,types,url,editorial_summary,current_opening_hours,secondary_opening_hours,wheelchair_accessible_entrance,delivery,dine_in,takeout,reservable,serves_breakfast,serves_lunch,serves_dinner,serves_beer,serves_wine,serves_vegetarian_food';
+    
     const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=${fields}&key=${googleApiKey}`;
     
     const response = await fetch(url);
